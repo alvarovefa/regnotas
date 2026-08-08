@@ -98,6 +98,9 @@ export default function Login() {
           >
             <Sparkles className="w-8 h-8" />
           </motion.div>
+          <h1 className="text-xl font-black text-indigo-600 tracking-wider uppercase mb-1">
+            RegNote
+          </h1>
           <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
             {step === 'rut' ? 'Bienvenido' : step === 'setup' ? 'Crear Clave' : 'Iniciar Sesión'}
           </h2>

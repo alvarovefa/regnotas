@@ -276,7 +276,7 @@ export default function AdminDashboard() {
               <CheckCircle2 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">Compulab</h1>
+              <h1 className="text-lg font-bold text-white tracking-tight">RegNote</h1>
               <span className="text-xs font-medium text-indigo-400 uppercase tracking-widest">Workspace</span>
             </div>
           </div>
@@ -1033,7 +1033,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
-                  <input type="email" placeholder="usuario@compulab.cl" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" required />
+                  <input type="email" placeholder="usuario@regnote.cl" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
