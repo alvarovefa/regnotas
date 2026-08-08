@@ -62,6 +62,7 @@ export default function Login() {
 
       if (!res.ok) throw new Error(data.message || 'Error al autenticar');
 
+      if (data.token) localStorage.setItem('token', data.token);
       login(data.user);
     } catch (err: any) {
       setError(err.message);

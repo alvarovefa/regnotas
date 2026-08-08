@@ -5,7 +5,7 @@ type User = {
   rut: string;
   nombre_completo: string;
   foto_perfil?: string;
-  rol: 'alumno' | 'profesor';
+  rol: 'alumno' | 'profesor' | 'directivo' | 'administrador';
 };
 
 type AuthContextType = {

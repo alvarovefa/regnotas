@@ -66,7 +66,7 @@ export const loginOrSetup = async (req: Request, res: Response): Promise<any> =>
     });
 
     const { password_hash, token_activacion, token_expiracion, ...userData } = user;
-    return res.json({ message: 'Autenticación exitosa', user: userData });
+    return res.json({ message: 'Autenticación exitosa', user: userData, token });
 
   } catch (error) {
     console.error(error);

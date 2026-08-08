@@ -11,6 +11,7 @@ import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth';
 import submissionsRoutes from './routes/submissions';
 import adminRoutes from './routes/admin';
+import academicRoutes from './routes/academic';
 
 dotenv.config();
 
@@ -30,7 +31,8 @@ app.use(cookieParser());
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 100 
+  max: 5000,
+  skip: (req) => req.path.startsWith('/admin') || req.path.startsWith('/api/admin') || req.path.startsWith('/api/academic')
 });
 app.use(limiter);
 
@@ -38,6 +40,7 @@ app.use(limiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/submissions', submissionsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/academic', academicRoutes);
 
 // Rutas básicas
 app.get('/api/health', (req, res) => {

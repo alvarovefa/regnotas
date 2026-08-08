@@ -5,18 +5,39 @@ import path from 'path';
 import fs from 'fs';
 import * as archiverModule from 'archiver';
 
-// Middleware para verificar si es profesor
+import bcrypt from 'bcrypt';
+
+// Middleware para verificar si es profesor o administrador
 export const requireTeacher = (req: Request, res: Response, next: NextFunction): any => {
   const user = (req as any).user;
-  if (!user || user.rol !== 'profesor') {
-    return res.status(403).json({ message: 'Acceso denegado: Se requiere rol de profesor' });
+  if (!user || (user.rol !== 'profesor' && user.rol !== 'directivo' && user.rol !== 'administrador')) {
+    return res.status(403).json({ message: 'Acceso denegado: Se requiere rol de profesor, directivo o administrador' });
   }
   next();
 };
 
 export const getCourses = async (req: Request, res: Response): Promise<any> => {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM cursos ORDER BY nombre ASC');
+    const user = (req as any).user;
+    let query = `
+      SELECT DISTINCT c.*, u.nombre_completo AS profesor_jefe_nombre 
+      FROM cursos c 
+      LEFT JOIN usuarios u ON c.profesor_jefe_id = u.id 
+    `;
+    const params: any[] = [];
+
+    if (user && user.rol === 'profesor') {
+      query += `
+        LEFT JOIN curso_asignaturas ca ON c.id = ca.curso_id
+        LEFT JOIN horarios h ON c.id = h.curso_id
+        WHERE c.profesor_jefe_id = ? OR ca.profesor_id = ? OR h.profesor_id = ?
+      `;
+      params.push(user.id, user.id, user.id);
+    }
+
+    query += ' ORDER BY c.nombre ASC';
+
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
     return res.json(rows);
   } catch (error) {
     console.error(error);
@@ -24,29 +45,39 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
+const isProfesorJefeOrAdmin = async (user: any, cursoId: number): Promise<boolean> => {
+  if (!user) return false;
+  if (user.rol === 'administrador' || user.rol === 'directivo') return true;
+  if (user.rol === 'profesor') {
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT profesor_jefe_id FROM cursos WHERE id = ?', [cursoId]);
+    if (rows.length > 0 && rows[0].profesor_jefe_id === user.id) return true;
+  }
+  return false;
+};
+
 export const createCourse = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { nombre } = req.body;
+    const { nombre, profesor_jefe_id } = req.body;
     if (!nombre) return res.status(400).json({ message: 'El nombre del curso es obligatorio' });
 
-    const [result] = await pool.query<ResultSetHeader>('INSERT INTO cursos (nombre) VALUES (?)', [nombre]);
-    return res.json({ message: 'Curso creado', id: result.insertId, nombre });
+    const [result] = await pool.query<ResultSetHeader>('INSERT INTO cursos (nombre, profesor_jefe_id) VALUES (?, ?)', [nombre, profesor_jefe_id || null]);
+    return res.json({ message: 'Curso creado', id: result.insertId, nombre, profesor_jefe_id });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error al crear el curso' });
+    return res.status(500).json({ message: 'Error al crear curso' });
   }
 };
 
 export const updateCourse = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    const { nombre } = req.body;
+    const { nombre, profesor_jefe_id } = req.body;
     if (!nombre) return res.status(400).json({ message: 'El nombre es obligatorio' });
-    await pool.query('UPDATE cursos SET nombre = ? WHERE id = ?', [nombre, id]);
+    await pool.query('UPDATE cursos SET nombre = ?, profesor_jefe_id = ? WHERE id = ?', [nombre, profesor_jefe_id || null, id]);
     return res.json({ message: 'Curso actualizado' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error al actualizar el curso' });
+    return res.status(500).json({ message: 'Error al actualizar curso' });
   }
 };
 
@@ -63,16 +94,44 @@ export const deleteCourse = async (req: Request, res: Response): Promise<any> =>
 
 export const getStudents = async (req: Request, res: Response): Promise<any> => {
   try {
+    const user = (req as any).user;
     const { cursoId } = req.query;
-    let query = 'SELECT id, rut, nombre_completo, curso_id FROM usuarios WHERE rol = "alumno"';
+    let query = 'SELECT u.id, u.rut, u.nombre_completo, u.curso_id, c.nombre as curso_nombre FROM usuarios u LEFT JOIN cursos c ON u.curso_id = c.id WHERE u.rol = "alumno"';
     const params: any[] = [];
-    
-    if (cursoId) {
-      query += ' AND curso_id = ?';
-      params.push(cursoId);
+
+    if (user && user.rol === 'profesor') {
+      const [assignedCourses] = await pool.query<RowDataPacket[]>(
+        `SELECT DISTINCT c.id FROM cursos c
+         LEFT JOIN curso_asignaturas ca ON c.id = ca.curso_id
+         LEFT JOIN horarios h ON c.id = h.curso_id
+         LEFT JOIN usuarios u_prof ON u_prof.id = ? AND u_prof.curso_id = c.id
+         WHERE c.profesor_jefe_id = ? OR u_prof.id IS NOT NULL OR ca.profesor_id = ? OR h.profesor_id = ?`,
+        [user.id, user.id, user.id, user.id]
+      );
+      const courseIds = assignedCourses.map(c => c.id);
+
+      if (courseIds.length === 0) {
+        return res.json([]);
+      }
+
+      if (cursoId) {
+        if (!courseIds.includes(Number(cursoId))) {
+          return res.status(403).json({ message: 'No tienes acceso a los alumnos de este curso' });
+        }
+        query += ' AND u.curso_id = ?';
+        params.push(cursoId);
+      } else {
+        query += ` AND u.curso_id IN (${courseIds.map(() => '?').join(',')})`;
+        params.push(...courseIds);
+      }
+    } else {
+      if (cursoId) {
+        query += ' AND u.curso_id = ?';
+        params.push(cursoId);
+      }
     }
-    
-    query += ' ORDER BY nombre_completo ASC';
+
+    query += ' ORDER BY u.nombre_completo ASC';
 
     const [rows] = await pool.query<RowDataPacket[]>(query, params);
     return res.json(rows);
@@ -104,7 +163,7 @@ export const getSubmissions = async (req: Request, res: Response): Promise<any> 
       params.push(tipo);
     }
     
-    query += ` ORDER BY e.fecha_hora_subida DESC`;
+    query += ' ORDER BY e.fecha_hora_subida DESC';
 
     const [rows] = await pool.query<RowDataPacket[]>(query, params);
     return res.json(rows);
@@ -116,11 +175,17 @@ export const getSubmissions = async (req: Request, res: Response): Promise<any> 
 
 export const addStudentsBulk = async (req: Request, res: Response): Promise<any> => {
   try {
+    const user = (req as any).user;
     const { students, cursoId } = req.body;
 
     if (!cursoId) return res.status(400).json({ message: 'El curso es obligatorio' });
     if (!Array.isArray(students) || students.length === 0) {
       return res.status(400).json({ message: 'La lista de alumnos está vacía' });
+    }
+
+    const canManage = await isProfesorJefeOrAdmin(user, Number(cursoId));
+    if (!canManage) {
+      return res.status(403).json({ message: 'Acceso denegado: Solo el Profesor Jefe de este curso o un Directivo puede agregar alumnos' });
     }
 
     let addedCount = 0;
@@ -134,7 +199,6 @@ export const addStudentsBulk = async (req: Request, res: Response): Promise<any>
         );
         addedCount++;
       } else {
-        // Opcional: Actualizar al nuevo curso si ya existía el RUT
         await pool.query('UPDATE usuarios SET curso_id = ?, nombre_completo = ? WHERE rut = ?', [cursoId, student.nombre_completo, student.rut]);
       }
     }
@@ -148,9 +212,21 @@ export const addStudentsBulk = async (req: Request, res: Response): Promise<any>
 
 export const updateStudent = async (req: Request, res: Response): Promise<any> => {
   try {
+    const user = (req as any).user;
     const { id } = req.params;
     const { rut, nombre_completo, curso_id } = req.body;
     if (!rut || !nombre_completo) return res.status(400).json({ message: 'RUT y Nombre son obligatorios' });
+
+    const [stud] = await pool.query<RowDataPacket[]>('SELECT curso_id FROM usuarios WHERE id = ?', [id]);
+    const targetCursoId = curso_id || (stud.length > 0 ? stud[0].curso_id : null);
+
+    if (targetCursoId) {
+      const canManage = await isProfesorJefeOrAdmin(user, Number(targetCursoId));
+      if (!canManage) {
+        return res.status(403).json({ message: 'Acceso denegado: Solo el Profesor Jefe de este curso o un Directivo puede editar este alumno' });
+      }
+    }
+
     await pool.query('UPDATE usuarios SET rut = ?, nombre_completo = ?, curso_id = ? WHERE id = ?', [rut, nombre_completo, curso_id || null, id]);
     return res.json({ message: 'Alumno actualizado' });
   } catch (error) {
@@ -161,7 +237,17 @@ export const updateStudent = async (req: Request, res: Response): Promise<any> =
 
 export const deleteStudent = async (req: Request, res: Response): Promise<any> => {
   try {
+    const user = (req as any).user;
     const { id } = req.params;
+
+    const [stud] = await pool.query<RowDataPacket[]>('SELECT curso_id FROM usuarios WHERE id = ?', [id]);
+    if (stud.length > 0 && stud[0].curso_id) {
+      const canManage = await isProfesorJefeOrAdmin(user, Number(stud[0].curso_id));
+      if (!canManage) {
+        return res.status(403).json({ message: 'Acceso denegado: Solo el Profesor Jefe de este curso o un Directivo puede eliminar este alumno' });
+      }
+    }
+
     await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
     return res.json({ message: 'Alumno eliminado' });
   } catch (error) {
@@ -174,20 +260,13 @@ export const downloadSingle = async (req: Request, res: Response): Promise<any> 
   try {
     const { id } = req.params;
     const [rows] = await pool.query<RowDataPacket[]>('SELECT nombre_almacenado, nombre_original FROM entregas WHERE id = ?', [id]);
-    
     if (rows.length === 0) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const file = rows[0];
-    const filePath = path.join(__dirname, '../../storage/uploads', file.nombre_almacenado);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: 'El archivo físico no existe en el disco' });
-    }
-
-    return res.download(filePath, file.nombre_original);
+    const filePath = path.join(__dirname, '../../uploads', rows[0].nombre_almacenado);
+    return res.download(filePath, rows[0].nombre_original);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error al descargar el archivo' });
+    return res.status(500).json({ message: 'Error al descargar archivo' });
   }
 };
 
@@ -247,19 +326,20 @@ export const downloadAllZip = async (req: Request, res: Response): Promise<any> 
 export const getGrades = async (req: Request, res: Response): Promise<any> => {
   try {
     const { cursoId } = req.query;
-    if (!cursoId) return res.status(400).json({ message: 'Debe especificar un curso' });
+    if (!cursoId) return res.status(400).json({ message: 'El cursoId es requerido' });
 
-    let query = `
-      SELECT u.id as usuario_id, u.rut, u.nombre_completo,
-             c.s1_n1, c.s1_n2, c.s1_n3, c.s1_n4, c.s1_n5, c.s1_n6,
-             c.s2_n1, c.s2_n2, c.s2_n3, c.s2_n4, c.s2_n5, c.s2_n6,
-             c.nota_recuperativa
-      FROM usuarios u
-      LEFT JOIN calificaciones c ON u.id = c.usuario_id
-      WHERE u.rol = "alumno" AND u.curso_id = ?
-      ORDER BY u.nombre_completo ASC
-    `;
-    const [rows] = await pool.query<RowDataPacket[]>(query, [cursoId]);
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT u.id AS usuario_id, u.rut, u.nombre_completo,
+              g.s1_n1, g.s1_n2, g.s1_n3, g.s1_n4, g.s1_n5, g.s1_n6,
+              g.s2_n1, g.s2_n2, g.s2_n3, g.s2_n4, g.s2_n5, g.s2_n6,
+              g.nota_recuperativa
+       FROM usuarios u
+       LEFT JOIN calificaciones g ON u.id = g.usuario_id
+       WHERE u.rol = 'alumno' AND u.curso_id = ?
+       ORDER BY u.nombre_completo ASC`,
+      [cursoId]
+    );
+
     return res.json(rows);
   } catch (error) {
     console.error(error);
@@ -267,18 +347,28 @@ export const getGrades = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
-export const updateGrades = async (req: Request, res: Response): Promise<any> => {
+export const updateGrade = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { usuario_id } = req.params;
-    const { s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6, s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6, nota_recuperativa } = req.body;
-    
-    await pool.query(`
-      INSERT INTO calificaciones (usuario_id, s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6, s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6, nota_recuperativa)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-      s1_n1 = VALUES(s1_n1), s1_n2 = VALUES(s1_n2), s1_n3 = VALUES(s1_n3), s1_n4 = VALUES(s1_n4), s1_n5 = VALUES(s1_n5), s1_n6 = VALUES(s1_n6),
-      s2_n1 = VALUES(s2_n1), s2_n2 = VALUES(s2_n2), s2_n3 = VALUES(s2_n3), s2_n4 = VALUES(s2_n4), s2_n5 = VALUES(s2_n5), s2_n6 = VALUES(s2_n6),
-      nota_recuperativa = VALUES(nota_recuperativa)
+    const {
+      usuario_id,
+      s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6,
+      s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6,
+      nota_recuperativa
+    } = req.body;
+
+    if (!usuario_id) return res.status(400).json({ message: 'usuario_id es requerido' });
+
+    await pool.query(
+      `INSERT INTO calificaciones (
+        usuario_id,
+        s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6,
+        s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6,
+        nota_recuperativa
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        s1_n1 = VALUES(s1_n1), s1_n2 = VALUES(s1_n2), s1_n3 = VALUES(s1_n3), s1_n4 = VALUES(s1_n4), s1_n5 = VALUES(s1_n5), s1_n6 = VALUES(s1_n6),
+        s2_n1 = VALUES(s2_n1), s2_n2 = VALUES(s2_n2), s2_n3 = VALUES(s2_n3), s2_n4 = VALUES(s2_n4), s2_n5 = VALUES(s2_n5), s2_n6 = VALUES(s2_n6),
+        nota_recuperativa = VALUES(nota_recuperativa)
     `, [
       usuario_id, 
       s1_n1 || null, s1_n2 || null, s1_n3 || null, s1_n4 || null, s1_n5 || null, s1_n6 || null,
@@ -292,3 +382,113 @@ export const updateGrades = async (req: Request, res: Response): Promise<any> =>
     return res.status(500).json({ message: 'Error al actualizar calificaciones' });
   }
 };
+
+export const getUsers = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { rol } = req.query;
+    let query = 'SELECT u.id, u.rut, u.nombre_completo, u.email, u.rol, u.curso_id, c.nombre as curso_nombre FROM usuarios u LEFT JOIN cursos c ON u.curso_id = c.id';
+    const params: any[] = [];
+
+    if (rol) {
+      query += ' WHERE u.rol = ?';
+      params.push(rol);
+    }
+    query += ' ORDER BY u.nombre_completo ASC';
+
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
+    return res.json(rows);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error al obtener usuarios' });
+  }
+};
+
+export const createUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { rut, nombre_completo, email, rol, curso_id, password } = req.body;
+    if (!rut || !nombre_completo || !email || !rol) {
+      return res.status(400).json({ message: 'RUT, Nombre, Email y Rol son obligatorios' });
+    }
+
+    const [existing] = await pool.query<RowDataPacket[]>('SELECT id FROM usuarios WHERE rut = ? OR email = ?', [rut, email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'El RUT o el Email ya se encuentran registrados' });
+    }
+
+    let password_hash: string | null = null;
+    let estado: 'pendiente' | 'activo' = 'pendiente';
+    if (password) {
+      password_hash = await bcrypt.hash(password, 10);
+      estado = 'activo';
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      'INSERT INTO usuarios (rut, nombre_completo, email, rol, curso_id, password_hash, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [rut, nombre_completo, email, rol, curso_id || null, password_hash, estado]
+    );
+
+    const newUserId = result.insertId;
+    if (rol === 'profesor' && curso_id) {
+      await pool.query('UPDATE cursos SET profesor_jefe_id = ? WHERE id = ?', [newUserId, curso_id]);
+    }
+
+    return res.json({ message: 'Usuario creado exitosamente', id: newUserId });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error al crear el usuario' });
+  }
+};
+
+export const updateUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const { rut, nombre_completo, email, rol, curso_id, password } = req.body;
+
+    if (!rut || !nombre_completo || !email || !rol) {
+      return res.status(400).json({ message: 'RUT, Nombre, Email y Rol son obligatorios' });
+    }
+
+    if (password && password.trim() !== '') {
+      const password_hash = await bcrypt.hash(password, 10);
+      await pool.query(
+        'UPDATE usuarios SET rut = ?, nombre_completo = ?, email = ?, rol = ?, curso_id = ?, password_hash = ?, estado = "activo" WHERE id = ?',
+        [rut, nombre_completo, email, rol, curso_id || null, password_hash, id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE usuarios SET rut = ?, nombre_completo = ?, email = ?, rol = ?, curso_id = ? WHERE id = ?',
+        [rut, nombre_completo, email, rol, curso_id || null, id]
+      );
+    }
+
+    if (rol === 'profesor') {
+      if (curso_id) {
+        await pool.query('UPDATE cursos SET profesor_jefe_id = ? WHERE id = ?', [id, curso_id]);
+      } else {
+        await pool.query('UPDATE cursos SET profesor_jefe_id = NULL WHERE profesor_jefe_id = ?', [id]);
+      }
+    }
+
+    return res.json({ message: 'Usuario actualizado exitosamente' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error al actualizar el usuario' });
+  }
+};
+
+export const deleteUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const currentUser = (req as any).user;
+    if (currentUser && currentUser.id === Number(id)) {
+      return res.status(400).json({ message: 'No puedes eliminar tu propia cuenta de usuario' });
+    }
+
+    await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+    return res.json({ message: 'Usuario eliminado exitosamente' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error al eliminar el usuario' });
+  }
+};
+

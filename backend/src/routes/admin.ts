@@ -14,7 +14,11 @@ import {
   updateStudent,
   deleteStudent,
   getGrades,
-  updateGrades
+  updateGrade,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser
 } from '../controllers/admin';
 
 const router = Router();
@@ -31,14 +35,16 @@ router.post('/students/bulk', addStudentsBulk);
 router.put('/students/:id', updateStudent);
 router.delete('/students/:id', deleteStudent);
 
+router.get('/users', getUsers);
+router.post('/users', createUser);
+router.put('/users/:id', updateUser);
+router.delete('/users/:id', deleteUser);
+
 router.get('/grades', getGrades);
-router.put('/grades/:usuario_id', updateGrades);
+router.put('/grades', updateGrade);
 
 router.get('/submissions', getSubmissions);
 router.get('/download/:id', downloadSingle);
 router.get('/download-all', downloadAllZip);
-
-router.get('/grades', getGrades);
-router.put('/grades/:usuario_id', updateGrades);
 
 export default router;

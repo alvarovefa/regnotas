@@ -21,7 +21,7 @@ function MainRoutes() {
         path="/dashboard" 
         element={
           <ProtectedRoute>
-            {user?.rol === 'profesor' ? <AdminDashboard /> : <Dashboard />}
+            {user?.rol === 'profesor' || user?.rol === 'directivo' || user?.rol === 'administrador' ? <AdminDashboard /> : <Dashboard />}
           </ProtectedRoute>
         } 
       />

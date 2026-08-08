@@ -9,6 +9,7 @@ export const pool = mysql.createPool({
   user: process.env.DB_USER || 'compulab_user',
   password: process.env.DB_PASSWORD || 'compulab_password',
   database: process.env.DB_NAME || 'compulab_db',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
