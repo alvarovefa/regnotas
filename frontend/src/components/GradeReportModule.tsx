@@ -19,6 +19,7 @@ export default function GradeReportModule({ courses = [], initialCourseId = '' }
   const [mode, setMode] = useState<'alumno' | 'curso'>('curso');
   const [periodo, setPeriodo] = useState<'s1' | 's2' | 'anual'>('s1');
   const [selectedStudentId, setSelectedStudentId] = useState<number | ''>('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [reportResponse, setReportResponse] = useState<{
@@ -40,6 +41,7 @@ export default function GradeReportModule({ courses = [], initialCourseId = '' }
   const fetchReportData = async () => {
     if (!selectedCourseId) return;
     setLoading(true);
+    setErrorMsg('');
     try {
       const url = `/api/academic/grade-reports/data?cursoId=${selectedCourseId}&periodo=${periodo}`;
       const res = await authFetch(url);
@@ -54,9 +56,15 @@ export default function GradeReportModule({ courses = [], initialCourseId = '' }
             setSelectedStudentId(data.informes[0].alumno.id);
           }
         }
+      } else {
+        const errorData = await res.json();
+        setReportResponse(null);
+        setErrorMsg(errorData.message || 'Error al obtener informes');
       }
     } catch (err) {
       console.error(err);
+      setReportResponse(null);
+      setErrorMsg('Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -259,6 +267,12 @@ export default function GradeReportModule({ courses = [], initialCourseId = '' }
                 <GradeReportTemplate report={reportData} />
               </div>
             ))}
+          </div>
+        ) : errorMsg ? (
+          <div className="no-print bg-slate-900 border border-slate-800 rounded-[2rem] p-16 text-center text-rose-500 space-y-2">
+            <AlertCircle className="w-10 h-10 text-rose-600 mx-auto" />
+            <p className="font-bold text-rose-500 text-lg">Acceso Denegado</p>
+            <p className="text-sm font-medium">{errorMsg}</p>
           </div>
         ) : (
           <div className="no-print bg-slate-900 border border-slate-800 rounded-[2rem] p-16 text-center text-slate-500 space-y-2">
