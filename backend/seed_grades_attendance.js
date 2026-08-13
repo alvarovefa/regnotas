@@ -14,7 +14,7 @@ const getRandomGrade = () => {
 
 async function seedData() {
   const connection = await mysql.createConnection({
-    host: 'localhost',
+    host: '127.0.0.1',
     port: 3307,
     user: 'compulab_user',
     password: 'compulab_password',

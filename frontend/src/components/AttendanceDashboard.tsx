@@ -62,8 +62,6 @@ export default function AttendanceDashboard({ cursoId, cursoNombre }: Props) {
 
   const totalReg = Number(stats.total_registros || 0);
   const totalPresentesGlobal = Number(stats.total_presentes || 0);
-  const totalAusentesGlobal = Number(stats.total_ausentes || 0);
-  const totalAtrasadosGlobal = Number(stats.total_atrasados || 0);
   const pctGlobal = totalReg > 0 ? Number(((totalPresentesGlobal / totalReg) * 100).toFixed(1)) : 100;
 
   return (

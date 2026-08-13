@@ -5,20 +5,24 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
-import './db';
-
 import cookieParser from 'cookie-parser';
+
+import './db';
+import { ENV } from './config/env';
+import { inputSanitizer } from './middlewares/sanitizer';
+import { errorHandler } from './middlewares/errorHandler';
+
 import authRoutes from './routes/auth';
 import submissionsRoutes from './routes/submissions';
 import adminRoutes from './routes/admin';
 import academicRoutes from './routes/academic';
+import groupsRoutes from './routes/groups';
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Middlewares
+// Middlewares de Seguridad y Parsing
 app.use(helmet());
 app.use(cors({
   origin: true,
@@ -27,6 +31,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(inputSanitizer);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -36,25 +41,31 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Rutas de API
+// Healthcheck
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date(), env: ENV.NODE_ENV });
+});
+
+// Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/submissions', submissionsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/academic', academicRoutes);
+app.use('/api/groups', groupsRoutes);
 
-// Rutas básicas
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-// Create storage directories if they don't exist
-const profilesDir = path.join(__dirname, '../storage/profiles');
+// Archivos estáticos de perfiles
+const profilesDir = ENV.STORAGE_PROFILES_DIR;
 if (!fs.existsSync(profilesDir)) {
   fs.mkdirSync(profilesDir, { recursive: true });
 }
 app.use('/api/profiles', express.static(profilesDir));
 
-// Start server
-app.listen(port, () => {
-  console.log(`🚀 Servidor backend corriendo en http://localhost:${port}`);
+// Middleware Global de Errores
+app.use(errorHandler);
+
+// Iniciar servidor
+app.listen(ENV.PORT, () => {
+  console.log(`🚀 Servidor backend corriendo en http://localhost:${ENV.PORT}`);
 });
+
+export default app;

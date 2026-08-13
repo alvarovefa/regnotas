@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, Plus, Trash2, User, Layers, Check } from 'lucide-react';
-import { motion } from 'framer-motion';
 
 type Subject = {
   id: number;
@@ -29,7 +28,7 @@ type Props = {
 export default function SubjectManagement({ courses, teachers }: Props) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [courseSubjects, setCourseSubjects] = useState<CourseSubject[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
+  const [selectedCourseId] = useState<number | ''>('');
   
   const [newSub, setNewSub] = useState({ nombre: '', codigo: '', color: '#6366f1' });
   const [assign, setAssign] = useState({ curso_id: '', asignatura_id: '', profesor_id: '' });

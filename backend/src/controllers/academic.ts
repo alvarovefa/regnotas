@@ -374,7 +374,11 @@ export const getAsistenciaDashboard = async (req: Request, res: Response): Promi
 export const getGradeReportData = async (req: Request, res: Response): Promise<any> => {
   try {
     const user = (req as any).user;
-    const { cursoId, periodo = 's1', alumnoId } = req.query;
+    let { cursoId, periodo = 's1', alumnoId } = req.query;
+
+    if (user.rol === 'alumno') {
+      return res.status(403).json({ message: 'Los alumnos no tienen permiso para generar informes de notas.' });
+    }
 
     if (!cursoId) return res.status(400).json({ message: 'El curso es obligatorio' });
 
@@ -389,6 +393,13 @@ export const getGradeReportData = async (req: Request, res: Response): Promise<a
 
     if (cursoRows.length === 0) return res.status(404).json({ message: 'Curso no encontrado' });
     const cursoInfo = cursoRows[0];
+    
+    // Verificar si es Profesor Jefe, Directivo o Administrador
+    const isJefeOrAdmin = user.rol === 'administrador' || user.rol === 'directivo' || (user.rol === 'profesor' && cursoInfo.profesor_jefe_id === user.id);
+    
+    if (!isJefeOrAdmin) {
+      return res.status(403).json({ message: 'Solo el profesor jefe, directivos o administradores pueden generar informes de notas.' });
+    }
 
     // 2. Obtener lista de alumnos
     let studentQuery = `SELECT id, rut, nombre_completo FROM usuarios WHERE rol = 'alumno' AND curso_id = ?`;
@@ -402,22 +413,9 @@ export const getGradeReportData = async (req: Request, res: Response): Promise<a
 
     const [alumnos] = await pool.query<RowDataPacket[]>(studentQuery, studentParams);
 
-    // 3. Determinar asignaturas según rol
-    const isJefeOrAdmin = user.rol === 'administrador' || user.rol === 'directivo' || (user.rol === 'profesor' && cursoInfo.profesor_jefe_id === user.id);
-
+    // 3. Determinar asignaturas
     let asignaturasQuery = `SELECT id, nombre, codigo FROM asignaturas ORDER BY nombre ASC`;
     const asignaturasParams: any[] = [];
-
-    if (!isJefeOrAdmin && user.rol === 'profesor') {
-      asignaturasQuery = `
-        SELECT DISTINCT a.id, a.nombre, a.codigo 
-        FROM asignaturas a
-        JOIN curso_asignaturas ca ON ca.asignatura_id = a.id
-        WHERE ca.curso_id = ? AND ca.profesor_id = ?
-        ORDER BY a.nombre ASC
-      `;
-      asignaturasParams.push(cursoId, user.id);
-    }
 
     const [asignaturas] = await pool.query<RowDataPacket[]>(asignaturasQuery, asignaturasParams);
 
@@ -429,7 +427,6 @@ export const getGradeReportData = async (req: Request, res: Response): Promise<a
         `SELECT * FROM calificaciones WHERE usuario_id = ?`,
         [alumno.id]
       );
-      const calif = califRows[0] || {};
 
       const [astRows] = await pool.query<RowDataPacket[]>(
         `SELECT 
@@ -447,6 +444,7 @@ export const getGradeReportData = async (req: Request, res: Response): Promise<a
       let asignaturasConPromedio = 0;
 
       const filasAsignaturas = asignaturas.map(asig => {
+        const calif = califRows.find((c: any) => c.asignatura_id === asig.id) || {};
         const n1 = periodo === 's2' ? calif.s2_n1 : calif.s1_n1;
         const n2 = periodo === 's2' ? calif.s2_n2 : calif.s1_n2;
         const n3 = periodo === 's2' ? calif.s2_n3 : calif.s1_n3;
@@ -513,3 +511,74 @@ export const getGradeReportData = async (req: Request, res: Response): Promise<a
     return res.status(500).json({ message: 'Error al generar datos del informe de notas' });
   }
 };
+export const getStudentSummary = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const user = (req as any).user;
+    if (user.rol !== 'alumno') return res.status(403).json({ message: 'Solo alumnos pueden ver este resumen' });
+
+    // Find course of the student
+    const [uRows] = await pool.query<RowDataPacket[]>('SELECT curso_id FROM usuarios WHERE id = ?', [user.id]);
+    const cursoId = uRows[0]?.curso_id;
+    if (!cursoId) return res.json({ asignaturas: [] });
+
+    // Fetch asignaturas for the course
+    const [asignaturas] = await pool.query<RowDataPacket[]>(
+      `SELECT a.id, a.nombre, a.codigo, a.color, u.nombre_completo AS profesor_nombre
+       FROM curso_asignaturas ca
+       JOIN asignaturas a ON ca.asignatura_id = a.id
+       JOIN usuarios u ON ca.profesor_id = u.id
+       WHERE ca.curso_id = ?
+       ORDER BY a.nombre ASC`,
+      [cursoId]
+    );
+
+    // Fetch calificaciones for the student
+    const [calificaciones] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM calificaciones WHERE usuario_id = ?',
+      [user.id]
+    );
+
+    // Compute averages
+    const asignaturasSummary = asignaturas.map(asig => {
+      const calif = calificaciones.find((c: any) => c.asignatura_id === asig.id) || {};
+      const s1Notas = [
+        calif.s1_n1, calif.s1_n2, calif.s1_n3, calif.s1_n4, calif.s1_n5, calif.s1_n6
+      ].map(n => n ? parseFloat(String(n)) : null).filter((n): n is number => n !== null && !isNaN(n));
+
+      const s2Notas = [
+        calif.s2_n1, calif.s2_n2, calif.s2_n3, calif.s2_n4, calif.s2_n5, calif.s2_n6
+      ].map(n => n ? parseFloat(String(n)) : null).filter((n): n is number => n !== null && !isNaN(n));
+
+      let s1Avg = null;
+      if (s1Notas.length > 0) {
+        s1Avg = Number((s1Notas.reduce((a, b) => a + b, 0) / s1Notas.length).toFixed(1));
+      }
+
+      let s2Avg = null;
+      if (s2Notas.length > 0) {
+        s2Avg = Number((s2Notas.reduce((a, b) => a + b, 0) / s2Notas.length).toFixed(1));
+      }
+
+      let promedio = null;
+      if (s1Avg !== null && s2Avg !== null) {
+        promedio = Number(((s1Avg + s2Avg) / 2).toFixed(1));
+      } else if (s1Avg !== null) {
+        promedio = s1Avg;
+      } else if (s2Avg !== null) {
+        promedio = s2Avg;
+      }
+
+      return {
+        ...asig,
+        promedio,
+        calificaciones: calif
+      };
+    });
+
+    return res.json({ asignaturas: asignaturasSummary });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Error al obtener resumen del estudiante' });
+  }
+};
+

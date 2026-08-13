@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Calendar, CheckCircle2, XCircle, Clock, ShieldCheck, FileCheck2, Loader2, Sparkles } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, Clock, ShieldCheck, FileCheck2, Loader2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type StudentAttendance = {

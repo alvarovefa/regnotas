@@ -18,7 +18,8 @@ import {
   getUsers,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  deleteSubmission
 } from '../controllers/admin';
 
 const router = Router();
@@ -44,6 +45,7 @@ router.get('/grades', getGrades);
 router.put('/grades', updateGrade);
 
 router.get('/submissions', getSubmissions);
+router.delete('/submissions/:id', deleteSubmission);
 router.get('/download/:id', downloadSingle);
 router.get('/download-all', downloadAllZip);
 

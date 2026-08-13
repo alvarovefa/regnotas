@@ -1,5 +1,3 @@
-import React from 'react';
-
 export type ReportFilAsignatura = {
   asignatura_id: number;
   asignatura_nombre: string;

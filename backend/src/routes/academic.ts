@@ -15,7 +15,8 @@ import {
   saveAsistenciaSheet,
   registrarPaseAtraso,
   getAsistenciaDashboard,
-  getGradeReportData
+  getGradeReportData,
+  getStudentSummary
 } from '../controllers/academic';
 
 const router = Router();
@@ -47,6 +48,9 @@ router.post('/attendance/pass', requireTeacher, registrarPaseAtraso);
 router.get('/attendance/dashboard', requireTeacher, getAsistenciaDashboard);
 
 // Emisión de Informes de Notas
-router.get('/grade-reports/data', requireTeacher, getGradeReportData);
+router.get('/grade-reports/data', getGradeReportData);
+
+// Resumen del Estudiante
+router.get('/student-summary', getStudentSummary);
 
 export default router;

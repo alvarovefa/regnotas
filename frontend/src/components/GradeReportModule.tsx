@@ -14,7 +14,7 @@ type Props = {
   userRole?: string;
 };
 
-export default function GradeReportModule({ courses = [], initialCourseId = '', userRole }: Props) {
+export default function GradeReportModule({ courses = [], initialCourseId = '' }: Props) {
   const [selectedCourseId, setSelectedCourseId] = useState<number | ''>(initialCourseId || (courses[0]?.id || ''));
   const [mode, setMode] = useState<'alumno' | 'curso'>('curso');
   const [periodo, setPeriodo] = useState<'s1' | 's2' | 'anual'>('s1');

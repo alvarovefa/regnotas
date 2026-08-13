@@ -49,8 +49,8 @@ export default function AdminDashboard() {
 
   // Estados para gestión de usuarios
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [newUser, setNewUser] = useState({ rut: '', nombre_completo: '', email: '', rol: 'alumno' as 'alumno' | 'profesor' | 'administrador', curso_id: '', password: '' });
-  const [editingUser, setEditingUser] = useState<{ id: number; rut: string; nombre_completo: string; email: string; rol: 'alumno' | 'profesor' | 'administrador'; curso_id: string; password?: string } | null>(null);
+  const [newUser, setNewUser] = useState({ rut: '', nombre_completo: '', email: '', rol: 'alumno' as 'alumno' | 'profesor' | 'directivo' | 'administrador', curso_id: '', password: '' });
+  const [editingUser, setEditingUser] = useState<{ id: number; rut: string; nombre_completo: string; email: string; rol: 'alumno' | 'profesor' | 'directivo' | 'administrador'; curso_id: string; password?: string } | null>(null);
   const [userFeedbackMsg, setUserFeedbackMsg] = useState('');
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -64,20 +64,45 @@ export default function AdminDashboard() {
     return fetch(url, { ...options, headers, credentials: 'include' });
   };
 
-  useEffect(() => { fetchCourses(); fetchUsers(); }, []);
-  useEffect(() => {
-    if (selectedCourseId) {
-      fetchSubmissions(); fetchStudents(); fetchGrades();
-    } else {
-      fetchSubmissions(); fetchStudents(); setGrades([]);
-    }
-  }, [selectedCourseId]);
+  const [courseSubjects, setCourseSubjects] = useState<any[]>([]);
+  const [selectedAsignaturaId, setSelectedAsignaturaId] = useState<number | ''>('');
 
   const fetchCourses = async () => { const res = await authFetch('/api/admin/courses'); if (res.ok) setCourses(await res.json()); };
-  const fetchSubmissions = async () => { const res = await authFetch(`/api/admin/submissions?cursoId=${selectedCourseId}`); if (res.ok) setSubmissions(await res.json()); };
+  const fetchCourseSubjects = async () => { 
+    if (!selectedCourseId) {
+      setCourseSubjects([]);
+      setSelectedAsignaturaId('');
+      return;
+    }
+    const res = await authFetch(`/api/academic/course-subjects?cursoId=${selectedCourseId}`); 
+    if (res.ok) {
+      const data = await res.json();
+      setCourseSubjects(data);
+      if (data.length > 0) setSelectedAsignaturaId(data[0].asignatura_id);
+      else setSelectedAsignaturaId('');
+    } 
+  };
+  
+  const fetchSubmissions = async () => { const res = await authFetch(`/api/admin/submissions?cursoId=${selectedCourseId}&asignaturaId=${selectedAsignaturaId}`); if (res.ok) setSubmissions(await res.json()); };
   const fetchStudents = async () => { const res = await authFetch(`/api/admin/students?cursoId=${selectedCourseId}`); if (res.ok) setStudents(await res.json()); };
-  const fetchGrades = async () => { const res = await authFetch(`/api/admin/grades?cursoId=${selectedCourseId}`); if (res.ok) setGrades(await res.json()); };
+  const fetchGrades = async () => { const res = await authFetch(`/api/admin/grades?cursoId=${selectedCourseId}&asignaturaId=${selectedAsignaturaId}`); if (res.ok) setGrades(await res.json()); };
   const fetchUsers = async () => { const res = await authFetch('/api/admin/users'); if (res.ok) setUsersList(await res.json()); };
+
+  useEffect(() => { fetchCourses(); fetchUsers(); }, []);
+  
+  useEffect(() => {
+    fetchCourseSubjects();
+    fetchStudents();
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (selectedCourseId) {
+      fetchSubmissions(); fetchGrades();
+    } else {
+      fetchSubmissions(); setGrades([]);
+    }
+  }, [selectedCourseId, selectedAsignaturaId]);
+
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,7 +223,7 @@ export default function AdminDashboard() {
     setGrades(prev => prev.map(g => g.usuario_id === userId ? { ...g, [field]: sanitized } : g));
   };
   const handleGradeBlur = async (row: GradeRow) => {
-    try { await authFetch(`/api/admin/grades/${row.usuario_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(row) }); } catch (err) { }
+    try { await authFetch(`/api/admin/grades/${row.usuario_id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...row, asignatura_id: selectedAsignaturaId }) }); } catch (err) { }
   };
 
   // Math
@@ -293,11 +318,27 @@ export default function AdminDashboard() {
               setSelectedCourseId(e.target.value ? Number(e.target.value) : '');
               if (activeTab === 'dashboard') setActiveTab('calificaciones');
             }}
-            className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium appearance-none"
+            className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium appearance-none mb-4"
           >
             <option value="">Todos los cursos</option>
             {courses.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
+          
+          {selectedCourseId !== '' && (
+            <>
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Selector de Asignatura</div>
+              <select 
+                value={selectedAsignaturaId} 
+                onChange={(e) => setSelectedAsignaturaId(e.target.value ? Number(e.target.value) : '')}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium appearance-none"
+              >
+                <option value="">Todas las asignaturas</option>
+                {courseSubjects.map((asig: any) => (
+                  <option key={asig.asignatura_id} value={asig.asignatura_id}>{asig.asignatura_nombre}</option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
@@ -418,7 +459,14 @@ export default function AdminDashboard() {
             )}
 
             {/* Calificaciones */}
-            {activeTab === 'calificaciones' && selectedCourseId && (
+            {activeTab === 'calificaciones' && selectedCourseId ? (
+              !selectedAsignaturaId ? (
+                <div className="bg-slate-900 rounded-[2rem] border border-slate-800 p-12 text-center text-slate-500 shadow-xl mt-6">
+                  <Layers className="w-12 h-12 text-indigo-500/50 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-white mb-2">Seleccione una Asignatura</h3>
+                  <p>Por favor, selecciona una asignatura en el menú de la izquierda para ver y editar las calificaciones.</p>
+                </div>
+              ) : (
               <motion.section 
                 key="grades"
                 initial={{ opacity: 0, y: 10 }}
@@ -576,7 +624,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </motion.section>
-            )}
+            )
+          ) : null}
 
             {/* Resto de Tabs - Adaptadas a Dark Mode Minimalista */}
             {activeTab === 'entregas' && (

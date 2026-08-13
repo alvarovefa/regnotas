@@ -6,6 +6,7 @@ import fs from 'fs';
 import * as archiverModule from 'archiver';
 
 import bcrypt from 'bcrypt';
+import { ENV } from '../config/env';
 
 // Middleware para verificar si es profesor o administrador
 export const requireTeacher = (req: Request, res: Response, next: NextFunction): any => {
@@ -143,9 +144,9 @@ export const getStudents = async (req: Request, res: Response): Promise<any> => 
 
 export const getSubmissions = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { cursoId, tipo } = req.query;
+    const { cursoId, tipo, asignaturaId } = req.query;
     let query = `
-      SELECT e.id, e.nombre_original, e.nombre_almacenado, e.tamano_bytes, e.fecha_hora_subida, e.tipo_entrega,
+      SELECT e.id, e.asignatura_id, e.nombre_original, e.nombre_almacenado, e.tamano_bytes, e.fecha_hora_subida, e.tipo_entrega,
              u.rut, u.nombre_completo, c.nombre as curso_nombre
       FROM entregas e
       JOIN usuarios u ON e.usuario_id = u.id
@@ -157,6 +158,10 @@ export const getSubmissions = async (req: Request, res: Response): Promise<any> 
     if (cursoId) {
       query += ` AND u.curso_id = ? `;
       params.push(cursoId);
+    }
+    if (asignaturaId) {
+      query += ` AND e.asignatura_id = ? `;
+      params.push(asignaturaId);
     }
     if (tipo) {
       query += ` AND e.tipo_entrega = ? `;
@@ -262,7 +267,7 @@ export const downloadSingle = async (req: Request, res: Response): Promise<any> 
     const [rows] = await pool.query<RowDataPacket[]>('SELECT nombre_almacenado, nombre_original FROM entregas WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(__dirname, '../../uploads', rows[0].nombre_almacenado);
+    const filePath = path.join(__dirname, '../../storage/uploads', rows[0].nombre_almacenado);
     return res.download(filePath, rows[0].nombre_original);
   } catch (error) {
     console.error(error);
@@ -325,19 +330,27 @@ export const downloadAllZip = async (req: Request, res: Response): Promise<any> 
 
 export const getGrades = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { cursoId } = req.query;
+    const { cursoId, asignaturaId } = req.query;
     if (!cursoId) return res.status(400).json({ message: 'El cursoId es requerido' });
+
+    const params: any[] = [];
+    let joinCond = 'g.usuario_id = u.id';
+    if (asignaturaId) {
+      joinCond += ' AND g.asignatura_id = ?';
+      params.push(asignaturaId);
+    }
+    params.push(cursoId);
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT u.id AS usuario_id, u.rut, u.nombre_completo,
               g.s1_n1, g.s1_n2, g.s1_n3, g.s1_n4, g.s1_n5, g.s1_n6,
               g.s2_n1, g.s2_n2, g.s2_n3, g.s2_n4, g.s2_n5, g.s2_n6,
-              g.nota_recuperativa
+              g.nota_recuperativa, g.asignatura_id
        FROM usuarios u
-       LEFT JOIN calificaciones g ON u.id = g.usuario_id
+       LEFT JOIN calificaciones g ON ${joinCond}
        WHERE u.rol = 'alumno' AND u.curso_id = ?
        ORDER BY u.nombre_completo ASC`,
-      [cursoId]
+      params
     );
 
     return res.json(rows);
@@ -350,27 +363,27 @@ export const getGrades = async (req: Request, res: Response): Promise<any> => {
 export const updateGrade = async (req: Request, res: Response): Promise<any> => {
   try {
     const {
-      usuario_id,
+      usuario_id, asignatura_id,
       s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6,
       s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6,
       nota_recuperativa
     } = req.body;
 
-    if (!usuario_id) return res.status(400).json({ message: 'usuario_id es requerido' });
+    if (!usuario_id || !asignatura_id) return res.status(400).json({ message: 'usuario_id y asignatura_id son requeridos' });
 
     await pool.query(
       `INSERT INTO calificaciones (
-        usuario_id,
+        usuario_id, asignatura_id,
         s1_n1, s1_n2, s1_n3, s1_n4, s1_n5, s1_n6,
         s2_n1, s2_n2, s2_n3, s2_n4, s2_n5, s2_n6,
         nota_recuperativa
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
         s1_n1 = VALUES(s1_n1), s1_n2 = VALUES(s1_n2), s1_n3 = VALUES(s1_n3), s1_n4 = VALUES(s1_n4), s1_n5 = VALUES(s1_n5), s1_n6 = VALUES(s1_n6),
         s2_n1 = VALUES(s2_n1), s2_n2 = VALUES(s2_n2), s2_n3 = VALUES(s2_n3), s2_n4 = VALUES(s2_n4), s2_n5 = VALUES(s2_n5), s2_n6 = VALUES(s2_n6),
         nota_recuperativa = VALUES(nota_recuperativa)
     `, [
-      usuario_id, 
+      usuario_id, asignatura_id,
       s1_n1 || null, s1_n2 || null, s1_n3 || null, s1_n4 || null, s1_n5 || null, s1_n6 || null,
       s2_n1 || null, s2_n2 || null, s2_n3 || null, s2_n4 || null, s2_n5 || null, s2_n6 || null,
       nota_recuperativa || null
@@ -489,6 +502,38 @@ export const deleteUser = async (req: Request, res: Response): Promise<any> => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error al eliminar el usuario' });
+  }
+};
+
+export const deleteSubmission = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT id, nombre_almacenado FROM entregas WHERE id = ?', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'La entrega no existe o ya fue eliminada' });
+    }
+
+    const submission = rows[0];
+    
+    if (submission.nombre_almacenado) {
+      const safeFilename = path.basename(submission.nombre_almacenado);
+      const filePath = path.join(ENV.STORAGE_UPLOADS_DIR, safeFilename);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (fsErr) {
+          console.error(`Error al eliminar archivo físico ${filePath}:`, fsErr);
+        }
+      }
+    }
+
+    await pool.query('DELETE FROM entregas WHERE id = ?', [id]);
+
+    return res.json({ message: 'Entrega eliminada exitosamente' });
+  } catch (error) {
+    console.error('Error al eliminar entrega:', error);
+    return res.status(500).json({ message: 'Error interno al eliminar la entrega' });
   }
 };
 

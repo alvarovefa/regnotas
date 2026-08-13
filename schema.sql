@@ -17,6 +17,7 @@ CREATE TABLE usuarios (
     token_activacion VARCHAR(255),
     token_expiracion DATETIME,
     estado ENUM('pendiente', 'activo') DEFAULT 'pendiente',
+    foto_perfil VARCHAR(500) NULL,
     FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE SET NULL
 );
 
@@ -119,3 +120,27 @@ CREATE TABLE pases_atraso (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (emisor_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
+
+CREATE TABLE grupos_trabajo (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    curso_id INT NOT NULL,
+    creado_por INT NOT NULL,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE,
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+CREATE TABLE grupo_integrantes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    grupo_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    fecha_union TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (grupo_id) REFERENCES grupos_trabajo(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_grupo_usuario (grupo_id, usuario_id)
+);
+
+ALTER TABLE entregas ADD COLUMN grupo_id INT NULL;
+ALTER TABLE entregas ADD CONSTRAINT fk_entregas_grupo FOREIGN KEY (grupo_id) REFERENCES grupos_trabajo(id) ON DELETE SET NULL;
+

@@ -1,1 +1,86 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   Modern & Minimalist Custom Scrollbars
+   ========================================================================== */
+
+/* Standard Firefox properties */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(107, 114, 128, 0.6) transparent;
+}
+
+/* WebKit & Blink Browsers (Chrome, Edge, Safari, Brave, Opera) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.35);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease-in-out;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.65);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: rgba(75, 85, 99, 0.85);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Custom Scrollbar Utility Classes */
+
+/* Subtle / Extra Thin Scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* Hidden Scrollbar while retaining scroll functionality */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Support dark mode / glassmorphism surfaces */
+@media (prefers-color-scheme: dark) {
+  * {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+  *:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.18);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+}
