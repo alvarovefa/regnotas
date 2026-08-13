@@ -138,15 +138,6 @@ export default function AdminDashboard() {
   };
 
   const handleBulkAdd = async () => {
-    // ...
-  };
-
-  const handleDeleteSubmission = async (id: number) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar permanentemente esta entrega? Esta acción no se puede deshacer y el archivo se borrará.')) return;
-    const res = await authFetch(`/api/admin/submissions/${id}`, { method: 'DELETE' });
-    if (res.ok) fetchSubmissions();
-    else alert('Error al eliminar la entrega');
-  };
     if (!studentsRaw.trim() || !selectedCourseId) return;
     setUploading(true); setMessage('');
     const parsedStudents = studentsRaw.split('\n').map(l => l.split(',')).filter(p => p.length >= 2).map(p => ({ rut: p[0].trim(), nombre_completo: p[1].trim() }));
@@ -157,6 +148,13 @@ export default function AdminDashboard() {
       setMessage(data.message || (res.ok ? 'Ok' : 'Error'));
       if (res.ok) { setStudentsRaw(''); fetchStudents(); fetchGrades(); }
     } catch (err) { setMessage('Error'); } finally { setUploading(false); }
+  };
+
+  const handleDeleteSubmission = async (id: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar permanentemente esta entrega? Esta acción no se puede deshacer y el archivo se borrará.')) return;
+    const res = await authFetch(`/api/admin/submissions/${id}`, { method: 'DELETE' });
+    if (res.ok) fetchSubmissions();
+    else alert('Error al eliminar la entrega');
   };
 
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
