@@ -138,6 +138,15 @@ export default function AdminDashboard() {
   };
 
   const handleBulkAdd = async () => {
+    // ...
+  };
+
+  const handleDeleteSubmission = async (id: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar permanentemente esta entrega? Esta acción no se puede deshacer y el archivo se borrará.')) return;
+    const res = await authFetch(`/api/admin/submissions/${id}`, { method: 'DELETE' });
+    if (res.ok) fetchSubmissions();
+    else alert('Error al eliminar la entrega');
+  };
     if (!studentsRaw.trim() || !selectedCourseId) return;
     setUploading(true); setMessage('');
     const parsedStudents = studentsRaw.split('\n').map(l => l.split(',')).filter(p => p.length >= 2).map(p => ({ rut: p[0].trim(), nombre_completo: p[1].trim() }));
@@ -653,7 +662,22 @@ export default function AdminDashboard() {
                           <td className="p-5"><div className="font-semibold text-slate-200">{sub.nombre_completo}</div><div className="text-xs text-slate-500 font-mono mt-1">{sub.rut}</div></td>
                           <td className="p-5 text-slate-300 text-sm flex items-center gap-3"><FileText className="w-5 h-5 text-indigo-400" /> {sub.nombre_original}</td>
                           <td className="p-5 text-slate-400 text-sm">{new Date(sub.fecha_hora_subida).toLocaleString('es-CL')}</td>
-                          <td className="p-5 text-center"><a href={`/api/admin/download/${sub.id}`} className="inline-flex p-2 text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition-colors"><Download className="w-5 h-5" /></a></td>
+                          <td className="p-5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <a href={`/api/admin/download/${sub.id}`} className="inline-flex p-2 text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition-colors" title="Descargar">
+                                <Download className="w-5 h-5" />
+                              </a>
+                              {user?.rol === 'administrador' && (
+                                <button 
+                                  onClick={() => handleDeleteSubmission(sub.id)}
+                                  className="inline-flex p-2 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors" 
+                                  title="Eliminar Entrega"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

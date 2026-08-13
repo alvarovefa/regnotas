@@ -507,6 +507,11 @@ export const deleteUser = async (req: Request, res: Response): Promise<any> => {
 
 export const deleteSubmission = async (req: Request, res: Response): Promise<any> => {
   try {
+    const currentUser = (req as any).user;
+    if (currentUser?.rol !== 'administrador') {
+      return res.status(403).json({ message: 'Acceso denegado: Solo el administrador puede eliminar entregas.' });
+    }
+
     const { id } = req.params;
     const [rows] = await pool.query<RowDataPacket[]>('SELECT id, nombre_almacenado FROM entregas WHERE id = ?', [id]);
     
