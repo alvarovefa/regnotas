@@ -17,6 +17,7 @@ import submissionsRoutes from './routes/submissions';
 import adminRoutes from './routes/admin';
 import academicRoutes from './routes/academic';
 import groupsRoutes from './routes/groups';
+import recursosRoutes from './routes/recursos';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/submissions', submissionsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/groups', groupsRoutes);
+app.use('/api/recursos', recursosRoutes);
 
 // Archivos estáticos de perfiles
 const profilesDir = ENV.STORAGE_PROFILES_DIR;

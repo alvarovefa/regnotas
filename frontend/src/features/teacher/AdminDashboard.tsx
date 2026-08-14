@@ -13,6 +13,7 @@ import GradeReportModule from '../../components/GradeReportModule';
 // Tipos
 type Course = { id: number; nombre: string; profesor_jefe_id?: number | null; profesor_jefe_nombre?: string };
 type Submission = { id: number; nombre_original: string; tamano_bytes: number; fecha_hora_subida: string; rut: string; nombre_completo: string; tipo_entrega: 'tarea' | 'evaluacion'; };
+type Recurso = { id: number; nombre_original: string; tamano_bytes: number; fecha_hora_subida: string; asignatura_nombre: string; curso_nombre: string; alumno_nombre: string; profesor_id: number; };
 type Student = { id: number; rut: string; nombre_completo: string; curso_id: number | null; };
 type UserItem = { id: number; rut: string; nombre_completo: string; email: string; rol: 'alumno' | 'profesor' | 'directivo' | 'administrador'; curso_id: number | null; curso_nombre?: string; };
 type GradeRow = {
@@ -28,11 +29,12 @@ export default function AdminDashboard() {
   const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
   
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<GradeRow[]>([]);
   const [usersList, setUsersList] = useState<UserItem[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'entregas' | 'alumnos' | 'cursos' | 'calificaciones' | 'usuarios' | 'asistencia' | 'horario' | 'asignaturas' | 'asistencia_dashboard' | 'informes'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'entregas' | 'recursos' | 'alumnos' | 'cursos' | 'calificaciones' | 'usuarios' | 'asistencia' | 'horario' | 'asignaturas' | 'asistencia_dashboard' | 'informes'>('dashboard');
   const [subTab, setSubTab] = useState<'tarea' | 'evaluacion'>('tarea');
   const [semesterTab, setSemesterTab] = useState<'s1' | 's2'>('s1');
   const [filterRole, setFilterRole] = useState<'todos' | 'alumno' | 'profesor' | 'directivo' | 'administrador'>('todos');
@@ -40,6 +42,13 @@ export default function AdminDashboard() {
   const [studentsRaw, setStudentsRaw] = useState('');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
+  
+  const [uploadingRecurso, setUploadingRecurso] = useState(false);
+  const [recursoMessage, setRecursoMessage] = useState('');
+  const [isUploadingRecursoModalOpen, setIsUploadingRecursoModalOpen] = useState(false);
+  const [recursoFile, setRecursoFile] = useState<File | null>(null);
+  const [recursoTargetType, setRecursoTargetType] = useState<'curso' | 'alumno'>('curso');
+  const [recursoTargetAlumnoId, setRecursoTargetAlumnoId] = useState<number | ''>('');
   
   const [newCourseName, setNewCourseName] = useState('');
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
@@ -84,6 +93,7 @@ export default function AdminDashboard() {
   };
   
   const fetchSubmissions = async () => { const res = await authFetch(`/api/admin/submissions?cursoId=${selectedCourseId}&asignaturaId=${selectedAsignaturaId}`); if (res.ok) setSubmissions(await res.json()); };
+  const fetchTeacherRecursos = async () => { const res = await authFetch(`/api/recursos/teacher?cursoId=${selectedCourseId}&asignaturaId=${selectedAsignaturaId}`); if (res.ok) setRecursos(await res.json()); };
   const fetchStudents = async () => { const res = await authFetch(`/api/admin/students?cursoId=${selectedCourseId}`); if (res.ok) setStudents(await res.json()); };
   const fetchGrades = async () => { const res = await authFetch(`/api/admin/grades?cursoId=${selectedCourseId}&asignaturaId=${selectedAsignaturaId}`); if (res.ok) setGrades(await res.json()); };
   const fetchUsers = async () => { const res = await authFetch('/api/admin/users'); if (res.ok) setUsersList(await res.json()); };
@@ -97,7 +107,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (selectedCourseId) {
-      fetchSubmissions(); fetchGrades();
+      fetchSubmissions(); fetchGrades(); fetchTeacherRecursos();
     } else {
       fetchSubmissions(); setGrades([]);
     }
@@ -155,6 +165,49 @@ export default function AdminDashboard() {
     const res = await authFetch(`/api/admin/submissions/${id}`, { method: 'DELETE' });
     if (res.ok) fetchSubmissions();
     else alert('Error al eliminar la entrega');
+  };
+
+  const handleUploadRecurso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recursoFile || !selectedCourseId || !selectedAsignaturaId) return;
+    
+    setUploadingRecurso(true);
+    setRecursoMessage('');
+    
+    const formData = new FormData();
+    formData.append('file', recursoFile);
+    formData.append('cursoId', String(selectedCourseId));
+    formData.append('asignaturaId', String(selectedAsignaturaId));
+    
+    if (recursoTargetType === 'alumno' && recursoTargetAlumnoId) {
+      formData.append('alumnoId', String(recursoTargetAlumnoId));
+    }
+
+    try {
+      const res = await authFetch('/api/recursos/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRecursoMessage('Archivo subido exitosamente');
+        fetchTeacherRecursos();
+        setTimeout(() => setIsUploadingRecursoModalOpen(false), 1500);
+      } else {
+        setRecursoMessage(data.message || 'Error al subir archivo');
+      }
+    } catch (err) {
+      setRecursoMessage('Error de red');
+    } finally {
+      setUploadingRecurso(false);
+    }
+  };
+
+  const handleDeleteRecurso = async (id: number) => {
+    if (!window.confirm('¿Eliminar este material compartido? Se borrará de forma permanente para todos los alumnos.')) return;
+    const res = await authFetch(`/api/recursos/${id}`, { method: 'DELETE' });
+    if (res.ok) fetchTeacherRecursos();
+    else alert('Error al eliminar recurso');
   };
 
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
@@ -357,6 +410,7 @@ export default function AdminDashboard() {
             { id: 'asistencia_dashboard', icon: BarChart3, label: 'Métricas Asistencia', adminOnly: false },
             { id: 'horario', icon: Calendar, label: 'Horario de Clases', adminOnly: false },
             { id: 'entregas', icon: FileText, label: 'Entregas', adminOnly: false },
+            { id: 'recursos', icon: Download, label: 'Material Compartido', adminOnly: false },
             { id: 'alumnos', icon: Users, label: 'Alumnos', adminOnly: false },
             { id: 'asignaturas', icon: Layers, label: 'Asignaturas & Cátedras', adminOnly: true },
             { id: 'cursos', icon: BookOpen, label: 'Cursos', adminOnly: true },
@@ -877,6 +931,70 @@ export default function AdminDashboard() {
               );
             })()}
 
+            {activeTab === 'recursos' && (
+              <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+                      <Download className="w-7 h-7 text-indigo-400" /> Material Compartido
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-1">Comparte archivos y recursos con tus estudiantes.</p>
+                  </div>
+                  <button onClick={() => { setRecursoMessage(''); setRecursoFile(null); setIsUploadingRecursoModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20">
+                    <Plus className="w-4 h-4" /> Compartir Archivo
+                  </button>
+                </div>
+
+                <div className="bg-slate-900 rounded-[1.5rem] md:rounded-[2rem] border border-slate-800 overflow-x-auto shadow-xl">
+                  <table className="w-full text-left whitespace-nowrap min-w-[600px]">
+                    <thead className="bg-slate-950/50">
+                      <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
+                        <th className="p-5">Destinatario</th><th className="p-5">Archivo</th><th className="p-5">Fecha</th><th className="p-5 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {recursos.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-10 text-center text-slate-500">
+                            No has compartido ningún archivo en esta asignatura.
+                          </td>
+                        </tr>
+                      ) : (
+                        recursos.map((rec) => (
+                          <tr key={rec.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="p-5">
+                              <div className="font-semibold text-slate-200">
+                                {rec.alumno_nombre ? rec.alumno_nombre : 'Todo el curso'}
+                              </div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                {rec.alumno_nombre ? 'Individual' : 'General'}
+                              </div>
+                            </td>
+                            <td className="p-5 text-slate-300 text-sm flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-indigo-400" /> {rec.nombre_original}
+                            </td>
+                            <td className="p-5 text-slate-400 text-sm">{new Date(rec.fecha_hora_subida).toLocaleString('es-CL')}</td>
+                            <td className="p-5 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <a href={`/api/recursos/download/${rec.id}`} className="inline-flex p-2 text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition-colors" title="Descargar">
+                                  <Download className="w-5 h-5" />
+                                </a>
+                                {(user?.rol === 'administrador' || user?.id === rec.profesor_id) && (
+                                  <button onClick={() => handleDeleteRecurso(rec.id)} className="inline-flex p-2 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors" title="Eliminar">
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.section>
+            )}
+
             {activeTab === 'cursos' && (
               <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -1185,6 +1303,73 @@ export default function AdminDashboard() {
               </form>
             </motion.div>
           </motion.div>
+        )}
+
+        {/* Modal: Subir Recurso */}
+        {isUploadingRecursoModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsUploadingRecursoModalOpen(false)} className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl w-full max-w-lg shadow-2xl">
+              <button onClick={() => setIsUploadingRecursoModalOpen(false)} className="absolute top-6 right-6 text-slate-500 hover:text-slate-300 bg-slate-800/50 hover:bg-slate-800 p-2 rounded-full transition-all">
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center">
+                  <Download className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Compartir Material</h3>
+                  <p className="text-slate-400 text-sm mt-0.5">Sube un archivo para compartir con tus alumnos.</p>
+                </div>
+              </div>
+
+              {recursoMessage && (
+                <div className={cn("p-4 rounded-xl text-sm font-medium mb-6 border", recursoMessage.includes('exitosamente') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20')}>
+                  {recursoMessage}
+                </div>
+              )}
+
+              <form onSubmit={handleUploadRecurso} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Archivo</label>
+                  <input type="file" required onChange={e => setRecursoFile(e.target.files?.[0] || null)} className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20 transition-all outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">¿Con quién deseas compartirlo?</label>
+                  <div className="flex gap-3">
+                    <label className={cn("flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 rounded-xl border transition-all", recursoTargetType === 'curso' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800')}>
+                      <input type="radio" className="hidden" checked={recursoTargetType === 'curso'} onChange={() => setRecursoTargetType('curso')} />
+                      Todo el Curso
+                    </label>
+                    <label className={cn("flex-1 cursor-pointer flex items-center justify-center gap-2 p-3 rounded-xl border transition-all", recursoTargetType === 'alumno' ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800')}>
+                      <input type="radio" className="hidden" checked={recursoTargetType === 'alumno'} onChange={() => setRecursoTargetType('alumno')} />
+                      Alumno Específico
+                    </label>
+                  </div>
+                </div>
+
+                {recursoTargetType === 'alumno' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Seleccionar Alumno</label>
+                    <select required value={recursoTargetAlumnoId} onChange={e => setRecursoTargetAlumnoId(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                      <option value="">Seleccione un alumno...</option>
+                      {students.map(s => (
+                        <option key={s.id} value={s.id}>{s.nombre_completo} ({s.rut})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button type="submit" disabled={uploadingRecurso} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {uploadingRecurso ? 'Subiendo...' : 'Subir Archivo'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

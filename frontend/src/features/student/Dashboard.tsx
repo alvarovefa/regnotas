@@ -22,6 +22,7 @@ type Submission = {
 
 type GroupMember = { usuario_id: number; rut: string; nombre_completo: string; foto_perfil?: string };
 type MyGroup = { id: number; nombre: string; curso_nombre: string; integrantes: GroupMember[]; entregas: Submission[] };
+type Recurso = { id: number; nombre_original: string; tamano_bytes: number; fecha_hora_subida: string; asignatura_nombre: string; asignatura_color: string; profesor_nombre: string; asignatura_id: number; };
 
 type AsignaturaSummary = {
   id: number;
@@ -46,6 +47,7 @@ export default function Dashboard() {
   }, [asignaturas]);
 
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [myGroups, setMyGroups] = useState<MyGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   
@@ -54,7 +56,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<'tarea' | 'evaluacion' | 'calificaciones' | 'grupo'>('tarea');
+  const [activeTab, setActiveTab] = useState<'tarea' | 'evaluacion' | 'calificaciones' | 'grupo' | 'recursos'>('tarea');
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const fetchAsignaturas = useCallback(async () => {
@@ -96,11 +98,21 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchRecursos = useCallback(async () => {
+    try {
+      const res = await fetch('/api/recursos/me');
+      if (res.ok) setRecursos(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAsignaturas();
     fetchSubmissions();
     fetchGroups();
-  }, [fetchAsignaturas, fetchSubmissions, fetchGroups]);
+    fetchRecursos();
+  }, [fetchAsignaturas, fetchSubmissions, fetchGroups, fetchRecursos]);
 
   const handleProfileUpload = async (file: File) => {
     const formData = new FormData();
@@ -424,11 +436,14 @@ export default function Dashboard() {
                 <div className="flex flex-wrap w-full sm:w-auto gap-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/50">
                   <button onClick={() => setActiveTab('tarea')} className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all", activeTab === 'tarea' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Tareas</button>
                   <button onClick={() => setActiveTab('evaluacion')} className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all", activeTab === 'evaluacion' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Evaluaciones</button>
-                  {myGroups.length > 0 && (
+                  {myGroups.filter(g => g.curso_nombre === selectedAsignatura?.nombre).length > 0 && (
                     <button onClick={() => setActiveTab('grupo')} className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5", activeTab === 'grupo' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
-                      <Users className="w-4 h-4" /> Mi Grupo
+                      <Users className="w-4 h-4" /> Grupos
                     </button>
                   )}
+                  <button onClick={() => setActiveTab('recursos')} className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5", activeTab === 'recursos' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                    <Download className="w-4 h-4" /> Material
+                  </button>
                   <button onClick={() => setActiveTab('calificaciones')} className={cn("px-4 py-2 rounded-lg text-sm font-bold transition-all", activeTab === 'calificaciones' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>Calificaciones</button>
                 </div>
               </div>
@@ -530,6 +545,34 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : activeTab === 'recursos' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {recursos.filter(r => r.asignatura_id === selectedAsignaturaId).length === 0 ? (
+                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-slate-400 bg-white/50 rounded-2xl border border-dashed border-slate-200">
+                      <Download className="w-12 h-12 mb-3 text-slate-300" />
+                      <p>No hay material compartido en esta asignatura</p>
+                    </div>
+                  ) : (
+                    recursos.filter(r => r.asignatura_id === selectedAsignaturaId).map(rec => (
+                      <div key={rec.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group flex items-center justify-between">
+                        <div className="flex items-center gap-4 truncate">
+                          <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-6 h-6" />
+                          </div>
+                          <div className="truncate pr-4">
+                            <div className="font-bold text-slate-700 truncate" title={rec.nombre_original}>{rec.nombre_original}</div>
+                            <div className="text-xs text-slate-400 mt-0.5 font-medium flex gap-2">
+                              <span>Prof: {rec.profesor_nombre}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <a href={`/api/recursos/download/${rec.id}`} className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white transition-colors flex-shrink-0">
+                          <Download className="w-5 h-5" />
+                        </a>
+                      </div>
+                    ))
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
