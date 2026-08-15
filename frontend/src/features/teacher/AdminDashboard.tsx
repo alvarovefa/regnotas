@@ -412,7 +412,7 @@ export default function AdminDashboard() {
             { id: 'entregas', icon: FileText, label: 'Entregas', adminOnly: false },
             { id: 'recursos', icon: Download, label: 'Material Compartido', adminOnly: false },
             { id: 'alumnos', icon: Users, label: 'Alumnos', adminOnly: false },
-            { id: 'asignaturas', icon: Layers, label: 'Asignaturas & Cátedras', adminOnly: true },
+            { id: 'asignaturas', icon: Layers, label: 'Asignaturas', adminOnly: true },
             { id: 'cursos', icon: BookOpen, label: 'Cursos', adminOnly: true },
             { id: 'usuarios', icon: UserCheck, label: 'Usuarios / Personal', adminOnly: true }
           ]
