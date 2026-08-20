@@ -34,8 +34,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend/storage/uploads:/app/storage/uploads
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -51,11 +50,40 @@ services:
     container_name: compulab_frontend
     ports:
       - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend_dev:
+    build: ./backend
+    container_name: compulab_backend_dev
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: compulab_user
+      DB_PASSWORD: compulab_password
+      DB_NAME: compulab_db
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  frontend_dev:
+    build: ./frontend
+    container_name: compulab_frontend_dev
+    ports:
+      - "5174:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    environment:
+      - BACKEND_URL=http://backend_dev:3000
     depends_on:
-      - backend
+      - backend_dev
     restart: unless-stopped
 
 volumes:
