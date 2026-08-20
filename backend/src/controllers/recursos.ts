@@ -89,7 +89,8 @@ export const getStudentRecursos = async (req: Request, res: Response): Promise<a
     const [userRows] = await pool.query<RowDataPacket[]>('SELECT curso_id FROM usuarios WHERE id = ?', [user.id]);
     const curso_id = userRows.length > 0 ? userRows[0].curso_id : null;
 
-    // The student can see resources targeted to their curso_id or their specific alumno_id
+    // The student can see resources targeted to their specific alumno_id, 
+    // or targeted to their curso_id ONLY if it's not targeted to a specific student
     const [rows] = await pool.query<RowDataPacket[]>(`
       SELECT r.*, 
              a.nombre as asignatura_nombre,
@@ -98,7 +99,7 @@ export const getStudentRecursos = async (req: Request, res: Response): Promise<a
       FROM recursos_compartidos r
       JOIN asignaturas a ON r.asignatura_id = a.id
       JOIN usuarios p ON r.profesor_id = p.id
-      WHERE r.alumno_id = ? OR r.curso_id = ?
+      WHERE r.alumno_id = ? OR (r.curso_id = ? AND r.alumno_id IS NULL)
       ORDER BY r.fecha_hora_subida DESC
     `, [user.id, curso_id]);
 
@@ -169,11 +170,14 @@ export const downloadRecurso = async (req: Request, res: Response): Promise<any>
       const [userRows] = await pool.query<RowDataPacket[]>('SELECT curso_id FROM usuarios WHERE id = ?', [user.id]);
       const curso_id = userRows.length > 0 ? userRows[0].curso_id : null;
 
-      if (recurso.alumno_id && recurso.alumno_id !== user.id) {
-        return res.status(403).json({ message: 'Acceso denegado' });
-      }
-      if (recurso.curso_id && recurso.curso_id !== curso_id) {
-        return res.status(403).json({ message: 'Acceso denegado' });
+      if (recurso.alumno_id) {
+        if (recurso.alumno_id !== user.id) {
+          return res.status(403).json({ message: 'Acceso denegado' });
+        }
+      } else if (recurso.curso_id) {
+        if (recurso.curso_id !== curso_id) {
+          return res.status(403).json({ message: 'Acceso denegado' });
+        }
       }
     }
 

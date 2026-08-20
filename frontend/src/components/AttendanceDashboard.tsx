@@ -266,7 +266,7 @@ export default function AttendanceDashboard({ cursoId, cursoNombre }: Props) {
             <h3 className="text-xl font-bold text-white flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-indigo-400" /> Asistencia del Curso por Asignatura
             </h3>
-            <span className="text-xs font-bold text-slate-500">Cátedras Oficiales</span>
+            <span className="text-xs font-bold text-slate-500">Asignaturas Oficiales</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

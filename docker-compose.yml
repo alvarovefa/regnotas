@@ -28,5 +28,35 @@ services:
       - mysql
     restart: unless-stopped
 
+  backend:
+    build: ./backend
+    container_name: compulab_backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: compulab_user
+      DB_PASSWORD: compulab_password
+      DB_NAME: compulab_db
+    depends_on:
+      - mysql
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: compulab_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   mysql_data:

@@ -302,7 +302,7 @@ export const getAsistenciaDashboard = async (req: Request, res: Response): Promi
       [cursoId]
     );
 
-    // 4. Asistencia por Asignatura (Cátedras asociadas al curso)
+    // 4. Asistencia por Asignatura (Asignaturas asociadas al curso)
     const [porAsignatura] = await pool.query<RowDataPacket[]>(
       `SELECT a.id AS asignatura_id, a.nombre AS asignatura_nombre, a.codigo AS asignatura_codigo, a.color AS asignatura_color,
               COUNT(ast.id) AS total_clases,

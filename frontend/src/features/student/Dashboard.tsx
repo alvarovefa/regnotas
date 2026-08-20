@@ -286,7 +286,13 @@ export default function Dashboard() {
               </div>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-slate-800 leading-tight">Hola, {user?.nombre_completo ? user.nombre_completo.split(' ')[0] : ''}</h1>
+              <h1 className="text-lg font-bold text-slate-800 leading-tight">
+                Hola, {user?.nombre_completo ? (
+                  user.nombre_completo === user.nombre_completo.toUpperCase() && user.nombre_completo.split(' ').length >= 3
+                    ? user.nombre_completo.split(' ')[2]
+                    : user.nombre_completo.split(' ')[0]
+                ) : ''}
+              </h1>
               <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{user?.rut}</span>
             </div>
           </div>

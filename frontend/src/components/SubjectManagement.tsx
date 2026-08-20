@@ -276,14 +276,14 @@ export default function SubjectManagement({ courses, teachers }: Props) {
               type="submit"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-1.5"
             >
-              <Check className="w-4 h-4" /> Asignar Cátedra
+              <Check className="w-4 h-4" /> Vincular Asignatura
             </button>
           </div>
         </form>
 
         {msg && <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl text-xs font-bold">{msg}</div>}
 
-        {/* Tabla de Cátedras Asignadas */}
+        {/* Tabla de Asignaturas Vinculadas */}
         <div className="overflow-x-auto">
           <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-slate-950 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase">

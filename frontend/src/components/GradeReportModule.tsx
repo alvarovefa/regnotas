@@ -242,7 +242,7 @@ export default function GradeReportModule({ courses = [], initialCourseId = '' }
               <span>
                 {reportResponse.isJefeOrAdmin
                   ? `Modo Completo: Tienes permisos para ver la nómina completa de asignaturas del curso ${selectedCourseObj?.nombre}.`
-                  : `Modo Asignatura: Como docente de cátedra, el informe incluye únicamente las materias que impartes.`
+                  : `Modo Asignatura: Como docente de la asignatura, el informe incluye únicamente las materias que impartes.`
                 }
               </span>
             </div>

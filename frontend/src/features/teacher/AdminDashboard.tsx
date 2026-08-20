@@ -58,9 +58,10 @@ export default function AdminDashboard() {
 
   // Estados para gestión de usuarios
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [newUser, setNewUser] = useState({ rut: '', nombre_completo: '', email: '', rol: 'alumno' as 'alumno' | 'profesor' | 'directivo' | 'administrador', curso_id: '', password: '' });
-  const [editingUser, setEditingUser] = useState<{ id: number; rut: string; nombre_completo: string; email: string; rol: 'alumno' | 'profesor' | 'directivo' | 'administrador'; curso_id: string; password?: string } | null>(null);
+  const [newUser, setNewUser] = useState({ rut: '', nombre_completo: '', email: '', rol: 'alumno' as 'alumno' | 'profesor' | 'directivo' | 'administrador', curso_id: '', password: '', confirmPassword: '' });
+  const [editingUser, setEditingUser] = useState<{ id: number; rut: string; nombre_completo: string; email: string; rol: 'alumno' | 'profesor' | 'directivo' | 'administrador'; curso_id: string; password?: string; confirmPassword?: string } | null>(null);
   const [userFeedbackMsg, setUserFeedbackMsg] = useState('');
+  const [searchUserQuery, setSearchUserQuery] = useState('');
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -213,6 +214,16 @@ export default function AdminDashboard() {
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserFeedbackMsg('');
+    if (newUser.password) {
+      if (newUser.password.length < 6) {
+        setUserFeedbackMsg('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      if (newUser.password !== newUser.confirmPassword) {
+        setUserFeedbackMsg('Las contraseñas no coinciden');
+        return;
+      }
+    }
     try {
       const res = await authFetch('/api/admin/users', {
         method: 'POST',
@@ -225,7 +236,7 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (res.ok) {
         setIsCreatingUser(false);
-        setNewUser({ rut: '', nombre_completo: '', email: '', rol: 'alumno', curso_id: '', password: '' });
+        setNewUser({ rut: '', nombre_completo: '', email: '', rol: 'alumno', curso_id: '', password: '', confirmPassword: '' });
         fetchUsers();
         fetchStudents();
       } else {
@@ -240,6 +251,16 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!editingUser) return;
     setUserFeedbackMsg('');
+    if (editingUser.password) {
+      if (editingUser.password.length < 6) {
+        setUserFeedbackMsg('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      if (editingUser.password !== editingUser.confirmPassword) {
+        setUserFeedbackMsg('Las contraseñas no coinciden');
+        return;
+      }
+    }
     try {
       const res = await authFetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
@@ -444,7 +465,13 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div className="text-sm">
-                <p className="font-semibold text-white">{user?.nombre_completo ? user.nombre_completo.split(' ')[0] : ''}</p>
+                <p className="font-semibold text-white">
+                  {user?.nombre_completo ? (
+                    user.nombre_completo === user.nombre_completo.toUpperCase() && user.nombre_completo.split(' ').length >= 3
+                      ? user.nombre_completo.split(' ')[2]
+                      : user.nombre_completo.split(' ')[0]
+                  ) : ''}
+                </p>
                 <p className="text-xs text-slate-500">{user?.rol === 'administrador' ? 'Administrador' : 'Profesor'}</p>
               </div>
             </div>
@@ -480,8 +507,14 @@ export default function AdminDashboard() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-8"
               >
-                <div>
-                  <h2 className="text-3xl font-bold text-white tracking-tight">Bienvenido, {user?.nombre_completo}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-bold text-white tracking-tight">
+                    Bienvenido, {user?.nombre_completo ? (
+                      user.nombre_completo === user.nombre_completo.toUpperCase() && user.nombre_completo.split(' ').length >= 3
+                        ? user.nombre_completo.split(' ')[2]
+                        : user.nombre_completo.split(' ')[0]
+                    ) : ''}
+                  </h2>
                   <p className="text-slate-400 mt-1">Aquí tienes un resumen de la actividad en la plataforma.</p>
                 </div>
 
@@ -1035,20 +1068,31 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
-                {/* Filtro por Rol */}
-                <div className="flex gap-2 p-1 bg-slate-900 rounded-xl border border-slate-800 w-fit">
-                  {(['todos', 'alumno', 'profesor', 'administrador'] as const).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setFilterRole(r)}
-                      className={cn(
-                        "px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider",
-                        filterRole === r ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
-                      )}
-                    >
-                      {r === 'todos' ? 'Todos' : r === 'alumno' ? 'Alumnos' : r === 'profesor' ? 'Docentes' : 'Administradores'}
-                    </button>
-                  ))}
+                {/* Filtros y Buscador */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex gap-2 p-1 bg-slate-900 rounded-xl border border-slate-800 w-fit">
+                    {(['todos', 'alumno', 'profesor', 'administrador'] as const).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setFilterRole(r)}
+                        className={cn(
+                          "px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider",
+                          filterRole === r ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+                        )}
+                      >
+                        {r === 'todos' ? 'Todos' : r === 'alumno' ? 'Alumnos' : r === 'profesor' ? 'Docentes' : 'Administradores'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative w-full sm:w-auto">
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por RUT o Nombre..." 
+                      value={searchUserQuery}
+                      onChange={(e) => setSearchUserQuery(e.target.value)}
+                      className="w-full sm:w-64 bg-slate-900 border border-slate-800 text-slate-200 px-4 py-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+                    />
+                  </div>
                 </div>
 
                 {/* Tabla de Usuarios */}
@@ -1067,6 +1111,7 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-slate-800">
                       {usersList
                         .filter(u => filterRole === 'todos' || u.rol === filterRole)
+                        .filter(u => searchUserQuery.trim() === '' || u.nombre_completo.toLowerCase().includes(searchUserQuery.toLowerCase()) || u.rut.toLowerCase().includes(searchUserQuery.toLowerCase()))
                         .map(u => (
                           <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
                             <td className="p-5 font-mono text-sm text-slate-400">{u.rut}</td>
@@ -1246,6 +1291,12 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Contraseña (opcional)</label>
                   <input type="password" placeholder="Definir contraseña inicial" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" />
                 </div>
+                {newUser.password && (
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Confirmar Contraseña</label>
+                    <input type="password" placeholder="Repite la contraseña" value={newUser.confirmPassword || ''} onChange={e => setNewUser({...newUser, confirmPassword: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setIsCreatingUser(false)} className="flex-1 py-3 text-slate-400 font-semibold hover:bg-slate-800 rounded-xl">Cancelar</button>
                   <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl">Crear</button>
@@ -1296,6 +1347,12 @@ export default function AdminDashboard() {
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Cambiar Contraseña (dejar vacío para mantener)</label>
                   <input type="password" placeholder="Nueva contraseña (opcional)" value={editingUser.password || ''} onChange={e => setEditingUser({...editingUser, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" />
                 </div>
+                {editingUser.password && (
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Confirmar Nueva Contraseña</label>
+                    <input type="password" placeholder="Repite la nueva contraseña" value={editingUser.confirmPassword || ''} onChange={e => setEditingUser({...editingUser, confirmPassword: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-slate-400 font-semibold hover:bg-slate-800 rounded-xl">Cancelar</button>
                   <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl">Guardar</button>

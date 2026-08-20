@@ -115,7 +115,7 @@ export default function ScheduleMatrix({ cursoId, cursoNombre, canEdit = false, 
         setTeachersList(teachs);
       }
 
-      // 4. Asignaciones Cátedra (Curso - Asignatura - Profesor)
+      // 4. Asignaciones de Asignatura (Curso - Asignatura - Profesor)
       const resCA = await authFetch(`/api/academic/course-subjects?cursoId=${cursoId}`);
       if (resCA.ok) {
         setCourseAssignments(await resCA.json());
@@ -385,7 +385,7 @@ export default function ScheduleMatrix({ cursoId, cursoNombre, canEdit = false, 
                       const isAssignedToCourse = courseAssignments.some(ca => String(ca.asignatura_id) === String(s.id));
                       return (
                         <option key={s.id} value={s.id}>
-                          {s.nombre} ({s.codigo}) {isAssignedToCourse ? '✓ Cátedra Asignada' : ''}
+                          {s.nombre} ({s.codigo}) {isAssignedToCourse ? '✓ Asignatura Vinculada' : ''}
                         </option>
                       );
                     })}

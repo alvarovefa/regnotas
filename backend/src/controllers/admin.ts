@@ -431,6 +431,9 @@ export const createUser = async (req: Request, res: Response): Promise<any> => {
     let password_hash: string | null = null;
     let estado: 'pendiente' | 'activo' = 'pendiente';
     if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+      }
       password_hash = await bcrypt.hash(password, 10);
       estado = 'activo';
     }
@@ -462,6 +465,9 @@ export const updateUser = async (req: Request, res: Response): Promise<any> => {
     }
 
     if (password && password.trim() !== '') {
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+      }
       const password_hash = await bcrypt.hash(password, 10);
       await pool.query(
         'UPDATE usuarios SET rut = ?, nombre_completo = ?, email = ?, rol = ?, curso_id = ?, password_hash = ?, estado = "activo" WHERE id = ?',

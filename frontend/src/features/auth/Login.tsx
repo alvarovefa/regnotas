@@ -84,7 +84,7 @@ export default function Login() {
   };
 
   const isRutValid = cleanRutStr(rut).length >= 7;
-  const isSubmitDisabled = loading || (step === 'setup' ? (password.length < 4 || confirmPassword.length < 4 || password !== confirmPassword) : password.length < 4);
+  const isSubmitDisabled = loading || (step === 'setup' ? (password.length < 6 || confirmPassword.length < 6 || password !== confirmPassword) : password.length < 6);
 
   return (
     <div className="min-h-screen bg-slate-50 relative flex items-center justify-center p-4 overflow-hidden">
@@ -187,7 +187,7 @@ export default function Login() {
                       onChange={(e) => { setPassword(e.target.value); setError(''); }}
                       className={cn(
                         "w-full pl-11 pr-4 py-3.5 rounded-2xl border bg-white/50 backdrop-blur-sm outline-none transition-all duration-300 font-medium text-slate-800",
-                        password.length >= 4 && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
+                        password.length >= 6 && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                         : error ? "border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" 
                         : "border-slate-200/80 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                       )}
@@ -210,7 +210,7 @@ export default function Login() {
                       onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
                       className={cn(
                         "w-full pl-11 pr-4 py-3.5 rounded-2xl border bg-white/50 backdrop-blur-sm outline-none transition-all duration-300 font-medium text-slate-800",
-                        confirmPassword.length >= 4 && confirmPassword === password && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
+                        confirmPassword.length >= 6 && confirmPassword === password && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                         : confirmPassword.length > 0 && confirmPassword !== password ? "border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" 
                         : error ? "border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" 
                         : "border-slate-200/80 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
@@ -237,7 +237,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     className={cn(
                       "w-full pl-11 pr-4 py-3.5 rounded-2xl border bg-white/50 backdrop-blur-sm outline-none transition-all duration-300 font-medium text-slate-800",
-                      password.length >= 4 && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
+                      password.length >= 6 && !error ? "border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" 
                       : error ? "border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" 
                       : "border-slate-200/80 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                     )}
